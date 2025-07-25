@@ -1,0 +1,109 @@
+basePath: /
+definitions:
+  http.ErrorResponse:
+    properties:
+      error:
+        example: 'Missing required parameter: lat'
+        type: string
+    type: object
+  http.WeatherData:
+    properties:
+      date:
+        example: "2025-07-25"
+        type: string
+      temp_max:
+        example: 38
+        type: number
+      temp_min:
+        example: 24.3
+        type: number
+    type: object
+  http.WeatherResponse:
+    properties:
+      forecast_window:
+        example: 5
+        type: integer
+      forecasts:
+        additionalProperties:
+          items:
+            $ref: '#/definitions/http.WeatherData'
+          type: array
+        type: object
+      latitude:
+        example: 40.7128
+        type: number
+      longitude:
+        example: -74.006
+        type: number
+    type: object
+host: localhost:8080
+info:
+  contact:
+    email: support@weatherapi.com
+    name: Weather API Support
+    url: https://github.com/your-username/weather-api
+  description: |-
+    A high-performance, multi-provider weather forecast API built with Go and Fiber.
+    This API aggregates weather data from multiple providers to provide reliable and comprehensive weather forecasts.
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  termsOfService: http://swagger.io/terms/
+  title: Weather API
+  version: 1.0.0
+paths:
+  /weather:
+    get:
+      consumes:
+      - application/json
+      description: Retrieves weather forecast data for a specific location from multiple
+        providers
+      parameters:
+      - description: Latitude coordinate (-90 to 90)
+        example: 40.7128
+        in: query
+        maximum: 90
+        minimum: -90
+        name: lat
+        required: true
+        type: number
+      - description: Longitude coordinate (-180 to 180)
+        example: -74.006
+        in: query
+        maximum: 180
+        minimum: -180
+        name: lon
+        required: true
+        type: number
+      - description: 'Number of forecast days (1-14, default: 5)'
+        example: 3
+        in: query
+        maximum: 14
+        minimum: 1
+        name: days
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successful response
+          schema:
+            $ref: '#/definitions/http.WeatherResponse'
+        "400":
+          description: Bad request - invalid parameters
+          schema:
+            $ref: '#/definitions/http.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/http.ErrorResponse'
+      summary: Get weather forecast
+      tags:
+      - Weather
+schemes:
+- http
+- https
+swagger: "2.0"
+tags:
+- description: Weather forecast operations
+  name: Weather

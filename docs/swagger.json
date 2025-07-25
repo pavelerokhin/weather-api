@@ -1,0 +1,152 @@
+{
+    "schemes": [
+        "http",
+        "https"
+    ],
+    "swagger": "2.0",
+    "info": {
+        "description": "A high-performance, multi-provider weather forecast API built with Go and Fiber.\nThis API aggregates weather data from multiple providers to provide reliable and comprehensive weather forecasts.",
+        "title": "Weather API",
+        "termsOfService": "http://swagger.io/terms/",
+        "contact": {
+            "name": "Weather API Support",
+            "url": "https://github.com/your-username/weather-api",
+            "email": "support@weatherapi.com"
+        },
+        "license": {
+            "name": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+        },
+        "version": "1.0.0"
+    },
+    "host": "localhost:8080",
+    "basePath": "/",
+    "paths": {
+        "/weather": {
+            "get": {
+                "description": "Retrieves weather forecast data for a specific location from multiple providers",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Weather"
+                ],
+                "summary": "Get weather forecast",
+                "parameters": [
+                    {
+                        "maximum": 90,
+                        "minimum": -90,
+                        "type": "number",
+                        "example": 40.7128,
+                        "description": "Latitude coordinate (-90 to 90)",
+                        "name": "lat",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "maximum": 180,
+                        "minimum": -180,
+                        "type": "number",
+                        "example": -74.006,
+                        "description": "Longitude coordinate (-180 to 180)",
+                        "name": "lon",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "maximum": 14,
+                        "minimum": 1,
+                        "type": "integer",
+                        "example": 3,
+                        "description": "Number of forecast days (1-14, default: 5)",
+                        "name": "days",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "schema": {
+                            "$ref": "#/definitions/http.WeatherResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request - invalid parameters",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "http.ErrorResponse": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string",
+                    "example": "Missing required parameter: lat"
+                }
+            }
+        },
+        "http.WeatherData": {
+            "type": "object",
+            "properties": {
+                "date": {
+                    "type": "string",
+                    "example": "2025-07-25"
+                },
+                "temp_max": {
+                    "type": "number",
+                    "example": 38
+                },
+                "temp_min": {
+                    "type": "number",
+                    "example": 24.3
+                }
+            }
+        },
+        "http.WeatherResponse": {
+            "type": "object",
+            "properties": {
+                "forecast_window": {
+                    "type": "integer",
+                    "example": 5
+                },
+                "forecasts": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/definitions/http.WeatherData"
+                        }
+                    }
+                },
+                "latitude": {
+                    "type": "number",
+                    "example": 40.7128
+                },
+                "longitude": {
+                    "type": "number",
+                    "example": -74.006
+                }
+            }
+        }
+    },
+    "tags": [
+        {
+            "description": "Weather forecast operations",
+            "name": "Weather"
+        }
+    ]
+}
