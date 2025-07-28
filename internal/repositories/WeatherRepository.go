@@ -26,7 +26,7 @@ func InitWeatherRepositories(cfg *config.Config, l *observe.Logger) []WeatherRep
 				APIKey: api.APIKey,
 				l:      l,
 			})
-			// Add more cases for new providers toi extyend the app
+			// add more cases for new providers toi extyend the app
 		}
 	}
 

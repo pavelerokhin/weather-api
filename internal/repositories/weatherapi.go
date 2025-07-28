@@ -48,7 +48,7 @@ type WeatherAPIErrorResponse struct {
 }
 
 func (w *WeatherAPIRepository) FetchForecast(ctx context.Context, lat, lon float64, forecastWindow int) ([]models.Response, error) {
-	url := fmt.Sprintf("%s?lat=%f&lon=%f&units=metric&appid=%s", OpenMeteoBaseURL, lat, lon, w.APIKey)
+	url := fmt.Sprintf("%s?lat=%f&lon=%f&units=metric&appid=%s", WeatherAPIBaseURL, lat, lon, w.APIKey)
 
 	w.l.Info("making API request", map[string]any{
 		"repository": w.Name(),
@@ -111,10 +111,6 @@ func (w *WeatherAPIRepository) FetchForecast(ctx context.Context, lat, lon float
 
 	var response WeatherAPIResponse
 	if err := json.Unmarshal(body, &response); err != nil {
-		w.l.Error(err, map[string]any{
-			"repository": w.Name(),
-			"body":       string(body),
-		})
 		return nil, fmt.Errorf("failed to parse JSON response: %w", err)
 	}
 

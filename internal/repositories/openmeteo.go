@@ -47,7 +47,6 @@ type DailyWeatherData struct {
 }
 
 func (o *OpenMeteoRepository) FetchForecast(ctx context.Context, lat, lon float64, forecastWindow int) ([]models.Response, error) {
-	// Always fetch a 5-day forecast
 	url := fmt.Sprintf("%s?latitude=%f&longitude=%f&daily=temperature_2m_max,temperature_2m_min&forecast_days=%d&timezone=auto", OpenMeteoBaseURL, lat, lon, forecastWindow)
 
 	o.l.Info("making API request", map[string]any{
@@ -60,9 +59,6 @@ func (o *OpenMeteoRepository) FetchForecast(ctx context.Context, lat, lon float6
 
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
-		o.l.Error(err, map[string]any{
-			"repository": o.Name(),
-		})
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 	resp, err := http.DefaultClient.Do(req)
@@ -125,62 +121,76 @@ func (o *OpenMeteoRepository) FetchForecast(ctx context.Context, lat, lon float6
 		"days":       len(response.Daily.Time),
 	})
 
-	// Check if we have any data
-	if len(response.Daily.Time) == 0 {
-		o.l.Warning("no forecast data received", map[string]any{
-			"repository": o.Name(),
-		})
+	// Validate that we have forecast data
+	if !o.hasForecastData(response.Daily) {
 		return nil, fmt.Errorf("no forecast data available")
 	}
 
-	// Convert to models.Response slice
-	var result []models.Response
+	// Convert API response to weather forecast models
+	forecastDays := o.buildForecastFromResponse(response.Daily)
+
+	o.l.Info("final forecast result", map[string]any{
+		"repository": o.Name(),
+		"days":       len(forecastDays),
+		"forecast":   forecastDays,
+	})
+
+	return forecastDays, nil
+}
+
+// hasForecastData checks if the daily forecast data contains valid time entries
+func (o *OpenMeteoRepository) hasForecastData(daily OpenMeteoResponse) bool {
+	return len(daily.Time) > 0
+}
+
+// buildForecastFromResponse converts the API response to weather forecast models
+func (o *OpenMeteoRepository) buildForecastFromResponse(daily OpenMeteoResponse) []models.Response {
+	var forecastDays []models.Response
 
 	// Find the minimum length to avoid index out of bounds
-	minLength := len(response.Daily.Time)
-	if len(response.Daily.Temperature2mMax) < minLength {
-		minLength = len(response.Daily.Temperature2mMax)
-	}
-	if len(response.Daily.Temperature2mMin) < minLength {
-		minLength = len(response.Daily.Temperature2mMin)
-	}
+	minLength := min(len(daily.Time), len(daily.Temperature2mMax), len(daily.Temperature2mMin))
 
 	// Check if we have enough data
 	if minLength == 0 {
 		o.l.Warning("insufficient temperature data", map[string]any{
 			"repository": o.Name(),
-			"timeLength": len(response.Daily.Time),
-			"maxLength":  len(response.Daily.Temperature2mMax),
-			"minLength":  len(response.Daily.Temperature2mMin),
+			"timeLength": len(daily.Time),
+			"maxLength":  len(daily.Temperature2mMax),
+			"minLength":  len(daily.Temperature2mMin),
 		})
-		return nil, fmt.Errorf("insufficient temperature data available")
+		return nil
 	}
 
+	// Build forecast for each day
 	for i := 0; i < minLength; i++ {
-		// Validate temperature data
-		if response.Daily.Temperature2mMax[i] < response.Daily.Temperature2mMin[i] {
-			o.l.Warning("invalid temperature data (max < min)", map[string]any{
-				"repository": o.Name(),
-				"date":       response.Daily.Time[i],
-				"max":        response.Daily.Temperature2mMax[i],
-				"min":        response.Daily.Temperature2mMin[i],
-			})
-			continue
+		dayForecast := o.createDayForecast(daily, i)
+		if dayForecast != nil {
+			forecastDays = append(forecastDays, *dayForecast)
 		}
-
-		response := models.Response{
-			Date:    response.Daily.Time[i],
-			TempMax: response.Daily.Temperature2mMax[i],
-			TempMin: response.Daily.Temperature2mMin[i],
-		}
-		result = append(result, response)
 	}
 
-	o.l.Info("final forecast result", map[string]any{
-		"repository": o.Name(),
-		"days":       len(result),
-		"forecast":   result,
-	})
+	return forecastDays
+}
 
-	return result, nil
+// createDayForecast creates a single day forecast, validating temperature data
+func (o *OpenMeteoRepository) createDayForecast(daily OpenMeteoResponse, index int) *models.Response {
+	maxTemp := daily.Temperature2mMax[index]
+	minTemp := daily.Temperature2mMin[index]
+
+	// Validate temperature data (max should be >= min)
+	if maxTemp < minTemp {
+		o.l.Warning("invalid temperature data (max < min)", map[string]any{
+			"repository": o.Name(),
+			"date":       daily.Time[index],
+			"max":        maxTemp,
+			"min":        minTemp,
+		})
+		return nil
+	}
+
+	return &models.Response{
+		Date:    daily.Time[index],
+		TempMax: maxTemp,
+		TempMin: minTemp,
+	}
 }
