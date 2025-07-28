@@ -117,10 +117,10 @@ func TestWeatherService_FetchForecasts_PartialFailure(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.NotNil(t, results)
-	assert.Len(t, results, 1) // Only successful repo should be in results
+	assert.Len(t, results, 2) // Both repos should be in results
 
 	assert.Equal(t, mockData, results["success-repo"])
-	assert.NotContains(t, results, "failure-repo")
+	assert.Equal(t, []models.Response{}, results["failure-repo"])
 }
 
 func TestWeatherService_FetchForecasts_AllFailures(t *testing.T) {
@@ -140,9 +140,11 @@ func TestWeatherService_FetchForecasts_AllFailures(t *testing.T) {
 
 	results, err := service.FetchForecasts(ctx, lat, lon, forecastWindow)
 
-	assert.Error(t, err)
-	assert.Equal(t, "no results found", err.Error())
-	assert.Nil(t, results)
+	assert.NoError(t, err)
+	assert.NotNil(t, results)
+	assert.Len(t, results, 2) // Both failed repos should be included with empty arrays
+	assert.Equal(t, []models.Response{}, results["failure-repo-1"])
+	assert.Equal(t, []models.Response{}, results["failure-repo-2"])
 }
 
 func TestWeatherService_FetchForecasts_EmptyRepositories(t *testing.T) {
@@ -159,9 +161,9 @@ func TestWeatherService_FetchForecasts_EmptyRepositories(t *testing.T) {
 
 	results, err := service.FetchForecasts(ctx, lat, lon, forecastWindow)
 
-	assert.Error(t, err)
-	assert.Equal(t, "no results found", err.Error())
-	assert.Nil(t, results)
+	assert.NoError(t, err)
+	assert.NotNil(t, results)
+	assert.Len(t, results, 0) // Empty map when no repositories
 }
 
 func TestWeatherService_FetchForecasts_ContextCancellation(t *testing.T) {
@@ -183,9 +185,10 @@ func TestWeatherService_FetchForecasts_ContextCancellation(t *testing.T) {
 
 	results, err := service.FetchForecasts(ctx, lat, lon, forecastWindow)
 
-	assert.Error(t, err)
-	assert.Equal(t, "no results found", err.Error())
-	assert.Nil(t, results)
+	assert.NoError(t, err)
+	assert.NotNil(t, results)
+	assert.Len(t, results, 1) // Failed repo should be included with empty array
+	assert.Equal(t, []models.Response{}, results["delayed-repo"])
 }
 
 func TestWeatherService_FetchForecasts_ConcurrentExecution(t *testing.T) {
@@ -270,9 +273,10 @@ func TestWeatherService_FetchForecasts_InvalidCoordinates(t *testing.T) {
 
 	results, err := service.FetchForecasts(ctx, lat, lon, forecastWindow)
 
-	assert.Error(t, err)
-	assert.Equal(t, "no results found", err.Error())
-	assert.Nil(t, results)
+	assert.NoError(t, err)
+	assert.NotNil(t, results)
+	assert.Len(t, results, 1) // Failed repo should be included with empty array
+	assert.Equal(t, []models.Response{}, results["test-repo"])
 }
 
 func TestWeatherService_FetchForecasts_MixedSuccessAndFailure(t *testing.T) {
@@ -304,10 +308,10 @@ func TestWeatherService_FetchForecasts_MixedSuccessAndFailure(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.NotNil(t, results)
-	assert.Len(t, results, 2) // Only successful repos
+	assert.Len(t, results, 4) // All repos should be in results
 
 	assert.Equal(t, mockData1, results["success-1"])
 	assert.Equal(t, mockData2, results["success-2"])
-	assert.NotContains(t, results, "failure-1")
-	assert.NotContains(t, results, "failure-2")
+	assert.Equal(t, []models.Response{}, results["failure-1"])
+	assert.Equal(t, []models.Response{}, results["failure-2"])
 }

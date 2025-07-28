@@ -43,6 +43,9 @@ type ErrorResponse struct {
 //
 //	curl -X GET "http://localhost:8080/weather?lat=40.7128&lon=-74.006&days=3"
 func (r *routes) handleWeatherCall(c *fiber.Ctx) error {
+	const defaultForecastWindow = 5
+	const maxForecastWindow = 14
+
 	lat := c.Query("lat")
 	lon := c.Query("lon")
 
@@ -86,9 +89,9 @@ func (r *routes) handleWeatherCall(c *fiber.Ctx) error {
 	}
 
 	// Get forecast window from query parameter (default to 5 days)
-	forecastWindow := 5
+	forecastWindow := defaultForecastWindow
 	if window := c.Query("days"); window != "" {
-		if days, err := strconv.Atoi(window); err == nil && days > 0 && days <= 14 {
+		if days, err := strconv.Atoi(window); err == nil && days > 0 && days <= maxForecastWindow {
 			forecastWindow = days
 		} else {
 			// Log warning but continue with default value
@@ -106,6 +109,7 @@ func (r *routes) handleWeatherCall(c *fiber.Ctx) error {
 			"lon":            lonFloat,
 			"forecastWindow": forecastWindow,
 		})
+
 		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{
 			Error: "Failed to fetch weather data",
 		})

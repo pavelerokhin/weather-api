@@ -4,14 +4,10 @@ import (
 	"context"
 	"sync"
 
-	"github.com/pkg/errors"
-
 	"weather-api/internal/models"
 	"weather-api/internal/repositories"
 	"weather-api/pkg/observe"
 )
-
-const defaultForecastWindow = 5
 
 // WeatherService represents the weather service.
 type WeatherService struct {
@@ -49,7 +45,12 @@ func (s *WeatherService) FetchForecasts(ctx context.Context, lat, lon float64, f
 
 			forecast, err := repo.FetchForecast(ctx, lat, lon, forecastWindow)
 			if err != nil {
-				s.l.Warning("failed to fetch forecast", map[string]any{"repo": repo.Name(), "err": err})
+				mu.Lock()
+				results[repo.Name()] = []models.Response{}
+				mu.Unlock()
+
+				s.l.Error(err, map[string]any{"repo": repo.Name(), "err": err})
+
 				return
 			}
 
@@ -67,18 +68,8 @@ func (s *WeatherService) FetchForecasts(ctx context.Context, lat, lon float64, f
 	wg.Wait()
 
 	s.l.Info("completed forecast fetch", map[string]any{
-		"successfulRepos": len(results),
-		"results":         results,
+		"results": results,
 	})
-
-	if len(results) == 0 {
-		s.l.Error(errors.New("no results found"), map[string]any{
-			"lat":            lat,
-			"lon":            lon,
-			"forecastWindow": forecastWindow,
-		})
-		return nil, errors.New("no results found")
-	}
 
 	return results, nil
 }
