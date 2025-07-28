@@ -71,10 +71,5 @@ func (s *WeatherService) FetchForecasts(ctx context.Context, lat, lon float64, f
 		"results": results,
 	})
 
-	if len(results) == 0 {
-		s.l.Warning("no results found")
-		return nil, nil
-	}
-
 	return results, nil
 }
