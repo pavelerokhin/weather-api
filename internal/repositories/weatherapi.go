@@ -6,14 +6,25 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+
 	"weather-api/internal/models"
 	"weather-api/pkg/observe"
 )
 
+const (
+	WeatherAPIBaseURL = "https://api.openweathermap.org/data/2.5/forecast"
+)
+
 type WeatherAPIRepository struct {
-	BaseURL string
-	APIKey  string
-	l       *observe.Logger
+	APIKey string
+	l      *observe.Logger
+}
+
+func NewWeatherAPIRepository(apiKey string, l *observe.Logger) *WeatherAPIRepository {
+	return &WeatherAPIRepository{
+		APIKey: apiKey,
+		l:      l,
+	}
 }
 
 func (w *WeatherAPIRepository) Name() string {
@@ -37,8 +48,7 @@ type WeatherAPIErrorResponse struct {
 }
 
 func (w *WeatherAPIRepository) FetchForecast(ctx context.Context, lat, lon float64, forecastWindow int) ([]models.Response, error) {
-	// Build URL for OpenWeatherMap forecast
-	url := fmt.Sprintf("%s?lat=%f&lon=%f&units=metric&appid=%s", w.BaseURL, lat, lon, w.APIKey)
+	url := fmt.Sprintf("%s?lat=%f&lon=%f&units=metric&appid=%s", OpenMeteoBaseURL, lat, lon, w.APIKey)
 
 	w.l.Info("making API request", map[string]any{
 		"repository": w.Name(),

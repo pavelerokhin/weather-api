@@ -6,13 +6,23 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+
 	"weather-api/internal/models"
 	"weather-api/pkg/observe"
 )
 
+const (
+	OpenMeteoBaseURL = "https://api.open-meteo.com/v1/forecast"
+)
+
 type OpenMeteoRepository struct {
-	BaseURL string
-	l       *observe.Logger
+	l *observe.Logger
+}
+
+func NewOpenMeteoRepository(l *observe.Logger) *OpenMeteoRepository {
+	return &OpenMeteoRepository{
+		l: l,
+	}
 }
 
 func (o *OpenMeteoRepository) Name() string {
@@ -38,7 +48,7 @@ type DailyWeatherData struct {
 
 func (o *OpenMeteoRepository) FetchForecast(ctx context.Context, lat, lon float64, forecastWindow int) ([]models.Response, error) {
 	// Always fetch a 5-day forecast
-	url := fmt.Sprintf("%s?latitude=%f&longitude=%f&daily=temperature_2m_max,temperature_2m_min&forecast_days=%d&timezone=auto", o.BaseURL, lat, lon, forecastWindow)
+	url := fmt.Sprintf("%s?latitude=%f&longitude=%f&daily=temperature_2m_max,temperature_2m_min&forecast_days=%d&timezone=auto", OpenMeteoBaseURL, lat, lon, forecastWindow)
 
 	o.l.Info("making API request", map[string]any{
 		"repository": o.Name(),

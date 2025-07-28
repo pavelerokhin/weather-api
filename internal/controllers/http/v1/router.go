@@ -2,11 +2,12 @@ package http
 
 import (
 	"os"
-	"weather-api/internal/services/weather"
-	"weather-api/pkg/observe"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/swagger"
+
+	"weather-api/internal/services/weather"
+	"weather-api/pkg/observe"
 )
 
 type routes struct {
