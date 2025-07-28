@@ -2,10 +2,10 @@ package repositories
 
 import (
 	"context"
-	"weather-api/pkg/observe"
 
 	"weather-api/config"
 	"weather-api/internal/models"
+	"weather-api/pkg/observe"
 )
 
 type WeatherRepository interface {
@@ -19,14 +19,12 @@ func InitWeatherRepositories(cfg *config.Config, l *observe.Logger) []WeatherRep
 		switch api.Name {
 		case "open-meteo":
 			repos = append(repos, &OpenMeteoRepository{
-				BaseURL: api.BaseURL,
-				l:       l,
+				l: l,
 			})
 		case "weatherapi":
 			repos = append(repos, &WeatherAPIRepository{
-				BaseURL: api.BaseURL,
-				APIKey:  api.APIKey,
-				l:       l,
+				APIKey: api.APIKey,
+				l:      l,
 			})
 			// Add more cases for new providers toi extyend the app
 		}

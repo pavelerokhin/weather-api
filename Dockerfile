@@ -14,10 +14,10 @@ RUN go mod download
 COPY . .
 
 # Build the application
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o weather-api ./cmd/weather-api
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o weather-api ./cmd/weather-api
 
 # Runtime stage
-FROM alpine:latest
+FROM alpine:3.19
 
 # Install ca-certificates for HTTPS requests
 RUN apk --no-cache add ca-certificates
@@ -33,7 +33,7 @@ WORKDIR /app
 COPY --from=builder /app/weather-api .
 
 # Copy config file
-COPY --from=builder /app/config/config.yaml ./config/
+COPY --from=builder /app/config/config.yaml ./config/config.yaml
 
 # Change ownership to non-root user
 RUN chown -R appuser:appgroup /app

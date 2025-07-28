@@ -5,7 +5,5 @@ port: "8080"
 
 weather_apis:
   - name: open-meteo
-    base_url: "https://api.open-meteo.com/v1/forecast"
   - name: weatherapi
-    base_url: "https://api.openweathermap.org/data/2.5/forecast"
     api_key: "YOUR-API-KEY-HERE"

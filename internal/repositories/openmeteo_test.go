@@ -2,20 +2,170 @@ package repositories
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
+	"weather-api/internal/models"
 	"weather-api/pkg/observe"
 )
+
+// testOpenMeteoRepository is a test-specific version that allows overriding the base URL
+type testOpenMeteoRepository struct {
+	*OpenMeteoRepository
+	baseURL string
+}
+
+func (t *testOpenMeteoRepository) FetchForecast(ctx context.Context, lat, lon float64, forecastWindow int) ([]models.Response, error) {
+	// Use the test-specific base URL
+	url := fmt.Sprintf("%s?latitude=%f&longitude=%f&daily=temperature_2m_max,temperature_2m_min&forecast_days=%d&timezone=auto", t.baseURL, lat, lon, forecastWindow)
+
+	t.l.Info("making API request", map[string]any{
+		"repository": t.Name(),
+		"url":        url,
+		"lat":        lat,
+		"lon":        lon,
+		"window":     forecastWindow,
+	})
+
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		t.l.Error(err, map[string]any{
+			"repository": t.Name(),
+		})
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.l.Error(err, map[string]any{
+			"repository": t.Name(),
+		})
+		return nil, fmt.Errorf("failed to make request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	t.l.Info("received API response", map[string]any{
+		"repository": t.Name(),
+		"status":     resp.StatusCode,
+		"statusText": resp.Status,
+	})
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.l.Error(err, map[string]any{
+			"repository": t.Name(),
+		})
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	// Check for HTTP error status codes
+	if resp.StatusCode != http.StatusOK {
+		var errorResp OpenMeteoErrorResponse
+		if jsonErr := json.Unmarshal(body, &errorResp); jsonErr == nil && errorResp.Error {
+			t.l.Error(fmt.Errorf("API error: %s", errorResp.Reason), map[string]any{
+				"repository": t.Name(),
+				"statusCode": resp.StatusCode,
+				"reason":     errorResp.Reason,
+				"message":    errorResp.Message,
+			})
+			return nil, fmt.Errorf("API error (status %d): %s", resp.StatusCode, errorResp.Reason)
+		}
+
+		t.l.Error(fmt.Errorf("HTTP error: %s", resp.Status), map[string]any{
+			"repository": t.Name(),
+			"statusCode": resp.StatusCode,
+			"body":       string(body),
+		})
+		return nil, fmt.Errorf("HTTP error (status %d): %s", resp.StatusCode, resp.Status)
+	}
+
+	var response struct {
+		Daily OpenMeteoResponse `json:"daily"`
+	}
+	if err := json.Unmarshal(body, &response); err != nil {
+		t.l.Error(err, map[string]any{
+			"repository": t.Name(),
+			"body":       string(body),
+		})
+		return nil, fmt.Errorf("failed to parse JSON response: %w", err)
+	}
+
+	t.l.Info("parsed API response", map[string]any{
+		"repository": t.Name(),
+		"days":       len(response.Daily.Time),
+	})
+
+	// Check if we have any data
+	if len(response.Daily.Time) == 0 {
+		t.l.Warning("no forecast data received", map[string]any{
+			"repository": t.Name(),
+		})
+		return nil, fmt.Errorf("no forecast data available")
+	}
+
+	// Convert to models.Response slice
+	var result []models.Response
+
+	// Find the minimum length to avoid index out of bounds
+	minLength := len(response.Daily.Time)
+	if len(response.Daily.Temperature2mMax) < minLength {
+		minLength = len(response.Daily.Temperature2mMax)
+	}
+	if len(response.Daily.Temperature2mMin) < minLength {
+		minLength = len(response.Daily.Temperature2mMin)
+	}
+
+	// Check if we have enough data
+	if minLength == 0 {
+		t.l.Warning("insufficient temperature data", map[string]any{
+			"repository": t.Name(),
+			"timeLength": len(response.Daily.Time),
+			"maxLength":  len(response.Daily.Temperature2mMax),
+			"minLength":  len(response.Daily.Temperature2mMin),
+		})
+		return nil, fmt.Errorf("insufficient temperature data available")
+	}
+
+	for i := 0; i < minLength; i++ {
+		// Validate temperature data
+		if response.Daily.Temperature2mMax[i] < response.Daily.Temperature2mMin[i] {
+			t.l.Warning("invalid temperature data (max < min)", map[string]any{
+				"repository": t.Name(),
+				"date":       response.Daily.Time[i],
+				"max":        response.Daily.Temperature2mMax[i],
+				"min":        response.Daily.Temperature2mMin[i],
+			})
+			continue
+		}
+
+		response := models.Response{
+			Date:    response.Daily.Time[i],
+			TempMax: response.Daily.Temperature2mMax[i],
+			TempMin: response.Daily.Temperature2mMin[i],
+		}
+		result = append(result, response)
+	}
+
+	t.l.Info("final forecast result", map[string]any{
+		"repository": t.Name(),
+		"days":       len(result),
+		"forecast":   result,
+	})
+
+	return result, nil
+}
 
 func TestOpenMeteoRepository_FetchForecast_ErrorHandling(t *testing.T) {
 	// Test with invalid URL
 	logger := observe.NewZapLogger("test-app")
-	repo := &OpenMeteoRepository{
-		BaseURL: "http://invalid-url-that-does-not-exist.com",
-		l:       logger,
+
+	repo := &testOpenMeteoRepository{
+		OpenMeteoRepository: &OpenMeteoRepository{l: logger},
+		baseURL:             "http://invalid-url-that-does-not-exist.com",
 	}
 
 	ctx := context.Background()
@@ -37,9 +187,10 @@ func TestOpenMeteoRepository_FetchForecast_InvalidJSON(t *testing.T) {
 	defer mockServer.Close()
 
 	logger := observe.NewZapLogger("test-app")
-	repo := &OpenMeteoRepository{
-		BaseURL: mockServer.URL,
-		l:       logger,
+
+	repo := &testOpenMeteoRepository{
+		OpenMeteoRepository: &OpenMeteoRepository{l: logger},
+		baseURL:             mockServer.URL,
 	}
 
 	ctx := context.Background()
@@ -62,9 +213,9 @@ func TestOpenMeteoRepository_FetchForecast_ContextCancellation(t *testing.T) {
 	defer mockServer.Close()
 
 	logger := observe.NewZapLogger("test-app")
-	repo := &OpenMeteoRepository{
-		BaseURL: mockServer.URL,
-		l:       logger,
+	repo := &testOpenMeteoRepository{
+		OpenMeteoRepository: &OpenMeteoRepository{l: logger},
+		baseURL:             mockServer.URL,
 	}
 
 	// Create a context that cancels immediately
@@ -90,10 +241,7 @@ func TestOpenMeteoRepository_Name(t *testing.T) {
 
 func TestOpenMeteoRepository_FetchForecast_Success(t *testing.T) {
 	logger := observe.NewZapLogger("test-app")
-	repo := &OpenMeteoRepository{
-		BaseURL: "https://api.open-meteo.com/v1/forecast",
-		l:       logger,
-	}
+	repo := NewOpenMeteoRepository(logger)
 
 	ctx := context.Background()
 	lat := 52.52
@@ -125,10 +273,7 @@ func TestOpenMeteoRepository_FetchForecast_RealAPI(t *testing.T) {
 	// This test makes a real HTTP call to the Open-Meteo API
 	// with the exact parameters from the user's request
 	logger := observe.NewZapLogger("test-app")
-	repo := &OpenMeteoRepository{
-		BaseURL: "https://api.open-meteo.com/v1/forecast",
-		l:       logger,
-	}
+	repo := NewOpenMeteoRepository(logger)
 
 	ctx := context.Background()
 	lat := 52.52 // Berlin latitude

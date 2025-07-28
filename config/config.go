@@ -2,10 +2,10 @@ package config
 
 import (
 	"fmt"
+	"gopkg.in/yaml.v3"
 	"os"
 
 	"github.com/kelseyhightower/envconfig"
-	"gopkg.in/yaml.v3"
 )
 
 type Config struct {
@@ -16,9 +16,8 @@ type Config struct {
 }
 
 type WeatherAPIConfig struct {
-	Name    string `yaml:"name"`
-	BaseURL string `yaml:"base_url"`
-	APIKey  string `yaml:"api_key,omitempty"`
+	Name   string `yaml:"name"`
+	APIKey string `yaml:"api_key,omitempty"`
 }
 
 func NewConfig() *Config {
@@ -27,7 +26,7 @@ func NewConfig() *Config {
 	// Read from YAML file first
 	if yamlData, err := os.ReadFile("config/config.yaml"); err == nil {
 		if err := yaml.Unmarshal(yamlData, &cnf); err != nil {
-			fmt.Printf("Warning: failed to parse YAML config: %v\n", err)
+			panic(fmt.Sprintf("Warning: failed to parse YAML config: %v\n", err))
 		}
 	}
 
