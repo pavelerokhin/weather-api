@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"weather-api/internal/models"
-	"weather-api/pkg/observe"
+	"weather-api/pkg/logger"
 )
 
 // testOpenMeteoRepository is a test-specific version that allows overriding the base URL
@@ -178,7 +178,7 @@ func (t *testOpenMeteoRepository) createDayForecast(daily OpenMeteoResponse, ind
 
 func TestOpenMeteoRepository_FetchForecast_ErrorHandling(t *testing.T) {
 	// Test with invalid URL
-	logger := observe.NewZapLogger("test-app")
+	logger := logger.NewZapLogger("test-app")
 
 	repo := &testOpenMeteoRepository{
 		OpenMeteoRepository: &OpenMeteoRepository{l: logger},
@@ -203,7 +203,7 @@ func TestOpenMeteoRepository_FetchForecast_InvalidJSON(t *testing.T) {
 	}))
 	defer mockServer.Close()
 
-	logger := observe.NewZapLogger("test-app")
+	logger := logger.NewZapLogger("test-app")
 
 	repo := &testOpenMeteoRepository{
 		OpenMeteoRepository: &OpenMeteoRepository{l: logger},
@@ -229,7 +229,7 @@ func TestOpenMeteoRepository_FetchForecast_ContextCancellation(t *testing.T) {
 	}))
 	defer mockServer.Close()
 
-	logger := observe.NewZapLogger("test-app")
+	logger := logger.NewZapLogger("test-app")
 	repo := &testOpenMeteoRepository{
 		OpenMeteoRepository: &OpenMeteoRepository{l: logger},
 		baseURL:             mockServer.URL,
@@ -257,7 +257,7 @@ func TestOpenMeteoRepository_Name(t *testing.T) {
 }
 
 func TestOpenMeteoRepository_FetchForecast_Success(t *testing.T) {
-	logger := observe.NewZapLogger("test-app")
+	logger := logger.NewZapLogger("test-app")
 	repo := NewOpenMeteoRepository(logger)
 
 	ctx := context.Background()
@@ -289,7 +289,7 @@ func TestOpenMeteoRepository_FetchForecast_Success(t *testing.T) {
 func TestOpenMeteoRepository_FetchForecast_RealAPI(t *testing.T) {
 	// This test makes a real HTTP call to the Open-Meteo API
 	// with the exact parameters from the user's request
-	logger := observe.NewZapLogger("test-app")
+	logger := logger.NewZapLogger("test-app")
 	repo := NewOpenMeteoRepository(logger)
 
 	ctx := context.Background()

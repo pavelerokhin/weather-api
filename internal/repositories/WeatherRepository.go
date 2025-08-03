@@ -5,7 +5,7 @@ import (
 
 	"weather-api/config"
 	"weather-api/internal/models"
-	"weather-api/pkg/observe"
+	"weather-api/pkg/logger"
 )
 
 type WeatherRepository interface {
@@ -13,7 +13,7 @@ type WeatherRepository interface {
 	FetchForecast(ctx context.Context, lat, lon float64, forecastWindow int) ([]models.Response, error)
 }
 
-func InitWeatherRepositories(cfg *config.Config, l *observe.Logger) []WeatherRepository {
+func InitWeatherRepositories(cfg *config.Config, l *logger.Logger) []WeatherRepository {
 	var repos []WeatherRepository
 	for _, api := range cfg.WeatherAPIs {
 		switch api.Name {

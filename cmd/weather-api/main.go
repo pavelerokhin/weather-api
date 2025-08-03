@@ -13,7 +13,7 @@ import (
 	"weather-api/internal/repositories"
 	"weather-api/internal/services/weather"
 	"weather-api/pkg/httpserver"
-	"weather-api/pkg/observe"
+	"weather-api/pkg/logger"
 )
 
 // @title Weather API
@@ -23,8 +23,8 @@ import (
 // @termsOfService http://swagger.io/terms/
 
 // @contact.name Weather API Support
-// @contact.url https://github.com/your-username/weather-api
-// @contact.email support@weatherapi.com
+// @contact.url https://github.com/pavelerokhin/weather-api
+// @contact.email pavel.v.erokhin@gmail.com
 
 // @license.name MIT
 // @license.url https://opensource.org/licenses/MIT
@@ -40,7 +40,7 @@ func main() {
 
 	cnf := config.NewConfig()
 
-	l := observe.NewZapLogger(cnf.AppName, os.Stdout)
+	l := logger.NewZapLogger(cnf.AppName, os.Stdout)
 
 	app := httpserver.InitFiberServer(cnf.AppName)
 

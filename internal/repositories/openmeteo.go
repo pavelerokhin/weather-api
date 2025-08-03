@@ -8,7 +8,7 @@ import (
 	"net/http"
 
 	"weather-api/internal/models"
-	"weather-api/pkg/observe"
+	"weather-api/pkg/logger"
 )
 
 const (
@@ -16,10 +16,10 @@ const (
 )
 
 type OpenMeteoRepository struct {
-	l *observe.Logger
+	l *logger.Logger
 }
 
-func NewOpenMeteoRepository(l *observe.Logger) *OpenMeteoRepository {
+func NewOpenMeteoRepository(l *logger.Logger) *OpenMeteoRepository {
 	return &OpenMeteoRepository{
 		l: l,
 	}

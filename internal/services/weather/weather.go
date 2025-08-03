@@ -6,16 +6,16 @@ import (
 
 	"weather-api/internal/models"
 	"weather-api/internal/repositories"
-	"weather-api/pkg/observe"
+	"weather-api/pkg/logger"
 )
 
 // WeatherService represents the weather service.
 type WeatherService struct {
 	repos []repositories.WeatherRepository
-	l     *observe.Logger
+	l     *logger.Logger
 }
 
-func NewWeatherService(repos []repositories.WeatherRepository, l *observe.Logger) *WeatherService {
+func NewWeatherService(repos []repositories.WeatherRepository, l *logger.Logger) *WeatherService {
 	return &WeatherService{
 		repos: repos,
 		l:     l,

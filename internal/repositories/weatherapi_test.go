@@ -11,12 +11,12 @@ import (
 	"time"
 
 	"weather-api/internal/models"
-	"weather-api/pkg/observe"
+	"weather-api/pkg/logger"
 )
 
 func TestWeatherAPIRepository_FetchForecast_ErrorHandling(t *testing.T) {
 	// Test with invalid URL
-	logger := observe.NewZapLogger("test-app")
+	logger := logger.NewZapLogger("test-app")
 	repo := NewWeatherAPIRepository("test-key", logger)
 
 	ctx := context.Background()
@@ -38,7 +38,7 @@ func TestWeatherAPIRepository_FetchForecast_InvalidJSON(t *testing.T) {
 	}))
 	defer mockServer.Close()
 
-	logger := observe.NewZapLogger("test-app")
+	logger := logger.NewZapLogger("test-app")
 	repo := &WeatherAPIRepository{
 		APIKey: "test-key",
 		l:      logger,
@@ -64,7 +64,7 @@ func TestWeatherAPIRepository_FetchForecast_ContextCancellation(t *testing.T) {
 	}))
 	defer mockServer.Close()
 
-	logger := observe.NewZapLogger("test-app")
+	logger := logger.NewZapLogger("test-app")
 	repo := &WeatherAPIRepository{
 		APIKey: "test-key",
 		l:      logger,
@@ -250,7 +250,7 @@ func TestWeatherAPIRepository_FetchForecast_Success(t *testing.T) {
 	}))
 	defer mockServer.Close()
 
-	logger := observe.NewZapLogger("test-app")
+	logger := logger.NewZapLogger("test-app")
 	repo := &testWeatherAPIRepository{
 		WeatherAPIRepository: &WeatherAPIRepository{
 			APIKey: "test-key",
@@ -297,7 +297,7 @@ func TestWeatherAPIRepository_FetchForecast_RealAPI(t *testing.T) {
 
 	// This test makes a real HTTP call to the OpenWeatherMap API
 	// Using the API key from the user's example
-	logger := observe.NewZapLogger("test-app")
+	logger := logger.NewZapLogger("test-app")
 	repo := &WeatherAPIRepository{
 		APIKey: "REAL_API_KEY", // Replace with a valid API key for testing
 		l:      logger,

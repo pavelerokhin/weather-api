@@ -12,7 +12,7 @@ import (
 	"weather-api/internal/models"
 	"weather-api/internal/repositories"
 	"weather-api/internal/services/weather"
-	"weather-api/pkg/observe"
+	"weather-api/pkg/logger"
 )
 
 // MockRepository implements WeatherRepository for testing
@@ -47,7 +47,7 @@ func (m *MockRepository) FetchForecast(ctx context.Context, lat, lon float64, fo
 }
 
 func TestNewWeatherService(t *testing.T) {
-	logger := observe.NewZapLogger("test-app")
+	logger := logger.NewZapLogger("test-app")
 	repos := []repositories.WeatherRepository{
 		&MockRepository{name: "test-repo-1"},
 		&MockRepository{name: "test-repo-2"},
@@ -59,7 +59,7 @@ func TestNewWeatherService(t *testing.T) {
 }
 
 func TestWeatherService_FetchForecasts_Success(t *testing.T) {
-	logger := observe.NewZapLogger("test-app")
+	logger := logger.NewZapLogger("test-app")
 
 	mockData1 := []models.Response{
 		{Date: "2025-07-25", TempMax: 25.0, TempMin: 15.0},
@@ -94,7 +94,7 @@ func TestWeatherService_FetchForecasts_Success(t *testing.T) {
 }
 
 func TestWeatherService_FetchForecasts_PartialFailure(t *testing.T) {
-	logger := observe.NewZapLogger("test-app")
+	logger := logger.NewZapLogger("test-app")
 
 	mockData := []models.Response{
 		{Date: "2025-07-25", TempMax: 25.0, TempMin: 15.0},
@@ -124,7 +124,7 @@ func TestWeatherService_FetchForecasts_PartialFailure(t *testing.T) {
 }
 
 func TestWeatherService_FetchForecasts_AllFailures(t *testing.T) {
-	logger := observe.NewZapLogger("test-app")
+	logger := logger.NewZapLogger("test-app")
 
 	repos := []repositories.WeatherRepository{
 		&MockRepository{name: "failure-repo-1", shouldFail: true},
@@ -148,7 +148,7 @@ func TestWeatherService_FetchForecasts_AllFailures(t *testing.T) {
 }
 
 func TestWeatherService_FetchForecasts_EmptyRepositories(t *testing.T) {
-	logger := observe.NewZapLogger("test-app")
+	logger := logger.NewZapLogger("test-app")
 
 	repos := []repositories.WeatherRepository{}
 
@@ -167,7 +167,7 @@ func TestWeatherService_FetchForecasts_EmptyRepositories(t *testing.T) {
 }
 
 func TestWeatherService_FetchForecasts_ContextCancellation(t *testing.T) {
-	logger := observe.NewZapLogger("test-app")
+	logger := logger.NewZapLogger("test-app")
 
 	repos := []repositories.WeatherRepository{
 		&MockRepository{name: "delayed-repo", shouldDelay: true},
@@ -192,7 +192,7 @@ func TestWeatherService_FetchForecasts_ContextCancellation(t *testing.T) {
 }
 
 func TestWeatherService_FetchForecasts_ConcurrentExecution(t *testing.T) {
-	logger := observe.NewZapLogger("test-app")
+	logger := logger.NewZapLogger("test-app")
 
 	// Create multiple repositories with different delays to test concurrency
 	repos := []repositories.WeatherRepository{
@@ -232,7 +232,7 @@ func TestWeatherService_FetchForecasts_ConcurrentExecution(t *testing.T) {
 }
 
 func TestWeatherService_FetchForecasts_DefaultForecastWindow(t *testing.T) {
-	logger := observe.NewZapLogger("test-app")
+	logger := logger.NewZapLogger("test-app")
 
 	mockData := []models.Response{
 		{Date: "2025-07-25", TempMax: 25.0, TempMin: 15.0},
@@ -258,7 +258,7 @@ func TestWeatherService_FetchForecasts_DefaultForecastWindow(t *testing.T) {
 }
 
 func TestWeatherService_FetchForecasts_InvalidCoordinates(t *testing.T) {
-	logger := observe.NewZapLogger("test-app")
+	logger := logger.NewZapLogger("test-app")
 
 	repos := []repositories.WeatherRepository{
 		&MockRepository{name: "test-repo", shouldFail: true}, // Will fail with invalid coordinates
@@ -280,7 +280,7 @@ func TestWeatherService_FetchForecasts_InvalidCoordinates(t *testing.T) {
 }
 
 func TestWeatherService_FetchForecasts_MixedSuccessAndFailure(t *testing.T) {
-	logger := observe.NewZapLogger("test-app")
+	logger := logger.NewZapLogger("test-app")
 
 	mockData1 := []models.Response{
 		{Date: "2025-07-25", TempMax: 25.0, TempMin: 15.0},

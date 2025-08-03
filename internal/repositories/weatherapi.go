@@ -8,7 +8,7 @@ import (
 	"net/http"
 
 	"weather-api/internal/models"
-	"weather-api/pkg/observe"
+	"weather-api/pkg/logger"
 )
 
 const (
@@ -17,10 +17,10 @@ const (
 
 type WeatherAPIRepository struct {
 	APIKey string
-	l      *observe.Logger
+	l      *logger.Logger
 }
 
-func NewWeatherAPIRepository(apiKey string, l *observe.Logger) *WeatherAPIRepository {
+func NewWeatherAPIRepository(apiKey string, l *logger.Logger) *WeatherAPIRepository {
 	return &WeatherAPIRepository{
 		APIKey: apiKey,
 		l:      l,

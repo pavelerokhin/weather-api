@@ -7,18 +7,18 @@ import (
 	"github.com/gofiber/swagger"
 
 	"weather-api/internal/services/weather"
-	"weather-api/pkg/observe"
+	"weather-api/pkg/logger"
 )
 
 type routes struct {
 	service *weather.WeatherService
-	l       *observe.Logger
+	l       *logger.Logger
 }
 
 func NewRouter(
 	app *fiber.App,
 	weatherService *weather.WeatherService,
-	l *observe.Logger,
+	l *logger.Logger,
 ) {
 	r := &routes{
 		service: weatherService,
