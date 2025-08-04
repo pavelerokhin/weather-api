@@ -15,7 +15,7 @@ type WeatherRepository interface {
 
 func InitWeatherRepositories(cfg *config.Config, l *logger.Logger) []WeatherRepository {
 	var repos []WeatherRepository
-	for _, api := range cfg.WeatherAPIs {
+	for _, api := range cfg.Weather.APIs {
 		switch api.Name {
 		case "open-meteo":
 			repos = append(repos, &OpenMeteoRepository{
@@ -26,7 +26,7 @@ func InitWeatherRepositories(cfg *config.Config, l *logger.Logger) []WeatherRepo
 				APIKey: api.APIKey,
 				l:      l,
 			})
-			// add more cases for new providers toi extyend the app
+			// add more cases for new providers to extend the app
 		}
 	}
 

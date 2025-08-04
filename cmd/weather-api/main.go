@@ -38,11 +38,16 @@ import (
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 
-	cnf := config.NewConfig()
+	// Load configuration with proper error handling
+	cnf, err := config.NewConfig()
+	if err != nil {
+		fmt.Printf("Failed to load configuration: %v\n", err)
+		os.Exit(1)
+	}
 
-	l := logger.NewZapLogger(cnf.AppName, os.Stdout)
+	l := logger.NewZapLogger(cnf.App.Name, os.Stdout)
 
-	app := httpserver.InitFiberServer(cnf.AppName)
+	app := httpserver.InitFiberServer(cnf.App.Name)
 
 	repos := repositories.InitWeatherRepositories(cnf, l)
 
@@ -55,12 +60,16 @@ func main() {
 	)
 
 	go func() {
-		if err := app.Listen(":" + cnf.Port); err != nil {
+		if err := app.Listen(":" + cnf.Server.Port); err != nil {
 			l.Fatal("cannot run the server", map[string]any{"err": err})
 		}
 	}()
 
-	l.Info("application started successfully", map[string]any{"port": cnf.Port})
+	l.Info("application started successfully", map[string]any{
+		"port": cnf.Server.Port,
+		"env":  cnf.App.Env,
+		"name": cnf.App.Name,
+	})
 
 	sigCh := make(chan os.Signal, 2)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
