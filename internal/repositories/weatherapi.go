@@ -130,6 +130,8 @@ func (w *WeatherAPIRepository) FetchForecast(ctx context.Context, lat, lon float
 	// Organize data by date and convert to models.Response slice
 	var result []models.Response
 	dailyTemps := make(map[string][]float64) // date -> []{min, max}
+	// Тут лучше объявить структуру
+	// make(map[string]models.Response
 
 	// Group temperatures by date
 	for _, item := range response.List {

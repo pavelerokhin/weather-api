@@ -33,6 +33,7 @@ func (s *WeatherService) FetchForecasts(ctx context.Context, lat, lon float64, f
 
 	results := make(map[string][]models.Response)
 	var mu sync.Mutex
+	// тут было бы красивее с каналами
 
 	wg := sync.WaitGroup{}
 

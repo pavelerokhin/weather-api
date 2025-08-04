@@ -16,7 +16,7 @@ type WeatherRepository interface {
 func InitWeatherRepositories(cfg *config.Config, l *logger.Logger) []WeatherRepository {
 	var repos []WeatherRepository
 	for _, api := range cfg.Weather.APIs {
-		switch api.Name {
+		switch api.Name { // Можно объявить тип с константами
 		case "open-meteo":
 			repos = append(repos, &OpenMeteoRepository{
 				l: l,
