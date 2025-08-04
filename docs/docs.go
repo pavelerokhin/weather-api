@@ -12,8 +12,8 @@ const docTemplate = `{
         "termsOfService": "http://swagger.io/terms/",
         "contact": {
             "name": "Weather API Support",
-            "url": "https://github.com/your-username/weather-api",
-            "email": "support@weatherapi.com"
+            "url": "https://github.com/pavelerokhin/weather-api",
+            "email": "pavel.v.erokhin@gmail.com"
         },
         "license": {
             "name": "MIT",

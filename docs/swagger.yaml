@@ -39,9 +39,9 @@ definitions:
 host: localhost:8080
 info:
   contact:
-    email: support@weatherapi.com
+    email: pavel.v.erokhin@gmail.com
     name: Weather API Support
-    url: https://github.com/your-username/weather-api
+    url: https://github.com/pavelerokhin/weather-api
   description: |-
     A high-performance, multi-provider weather forecast API built with Go and Fiber.
     This API aggregates weather data from multiple providers to provide reliable and comprehensive weather forecasts.
