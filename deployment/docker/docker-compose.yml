@@ -1,0 +1,64 @@
+services:
+  # Main application service
+  weather-api:
+    build:
+      context: ../..
+      dockerfile: deployment/docker/Dockerfile
+      target: runtime-alpine  # Use Alpine runtime for development
+    container_name: weather-api
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - GIN_MODE=release
+      - TZ=UTC
+    volumes:
+      # Mount config for development (read-only)
+      - ../../config:/app/config:ro
+    networks:
+      - weather-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+
+  # Development service with hot reload (optional)
+  weather-api-dev:
+    build:
+      context: ../..
+      dockerfile: deployment/docker/Dockerfile
+      target: builder
+    container_name: weather-api-dev
+    ports:
+      - "8081:8080"
+    environment:
+      - PORT=8080
+      - GIN_MODE=debug
+      - TZ=UTC
+    volumes:
+      # Mount source code for hot reload
+      - ../../:/app
+      - go-cache:/go
+    working_dir: /app
+    command: ["go", "run", "./cmd/weather-api"]
+    networks:
+      - weather-network
+    profiles:
+      - dev
+
+# Networks
+networks:
+  weather-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+# Volumes
+volumes:
+  go-cache:
+    driver: local

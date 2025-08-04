@@ -1,0 +1,110 @@
+# Git and version control
+.git
+.gitignore
+.gitattributes
+.github
+
+# Documentation
+README.md
+docs/
+*.md
+
+# Development and IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Build artifacts and binaries
+build/
+dist/
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+coverage.out
+coverage.html
+
+# Logs and temporary files
+*.log
+logs/
+tmp/
+temp/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Test files and coverage
+*_test.go
+test/
+tests/
+coverage/
+
+# Development tools and scripts
+Makefile
+scripts/
+tools/
+
+# Docker files (except the one we're building)
+Dockerfile.*
+docker-compose*.yml
+.dockerignore
+
+# CI/CD files
+.github/
+.gitlab-ci.yml
+.travis.yml
+.circleci/
+
+# Package manager files
+package.json
+package-lock.json
+yarn.lock
+node_modules/
+
+# Go specific
+vendor/
+*.prof
+*.trace
+
+# Configuration files that might contain secrets
+config/local.yaml
+config/dev.yaml
+config/prod.yaml
+*.key
+*.pem
+*.crt
+
+# Backup files
+*.bak
+*.backup
+*.old
+
+# Archive files
+*.tar
+*.tar.gz
+*.zip
+*.rar
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Cache directories
+.cache/
+cache/ 
