@@ -2,11 +2,25 @@ package repositories
 
 import (
 	"context"
+	"net/http"
 
 	"weather-api/config"
 	"weather-api/internal/models"
 	"weather-api/pkg/logger"
 )
+
+// HTTPClient interface for making HTTP requests
+// This allows for easy mocking in tests
+type HTTPClient interface {
+	Do(req *http.Request) (*http.Response, error)
+}
+
+// DefaultHTTPClient wraps the standard http.DefaultClient
+type DefaultHTTPClient struct{}
+
+func (c *DefaultHTTPClient) Do(req *http.Request) (*http.Response, error) {
+	return http.DefaultClient.Do(req)
+}
 
 type WeatherRepository interface {
 	Name() string
@@ -15,17 +29,14 @@ type WeatherRepository interface {
 
 func InitWeatherRepositories(cfg *config.Config, l *logger.Logger) []WeatherRepository {
 	var repos []WeatherRepository
+	httpClient := &DefaultHTTPClient{}
+
 	for _, api := range cfg.Weather.APIs {
 		switch api.Name {
 		case "open-meteo":
-			repos = append(repos, &OpenMeteoRepository{
-				l: l,
-			})
+			repos = append(repos, NewOpenMeteoRepository(l, httpClient))
 		case "weatherapi":
-			repos = append(repos, &WeatherAPIRepository{
-				APIKey: api.APIKey,
-				l:      l,
-			})
+			repos = append(repos, NewWeatherAPIRepository(api.APIKey, l, httpClient))
 			// add more cases for new providers to extend the app
 		}
 	}

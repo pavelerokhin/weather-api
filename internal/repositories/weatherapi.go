@@ -16,14 +16,16 @@ const (
 )
 
 type WeatherAPIRepository struct {
-	APIKey string
-	l      *logger.Logger
+	APIKey     string
+	httpClient HTTPClient
+	l          *logger.Logger
 }
 
-func NewWeatherAPIRepository(apiKey string, l *logger.Logger) *WeatherAPIRepository {
+func NewWeatherAPIRepository(apiKey string, l *logger.Logger, httpClient HTTPClient) *WeatherAPIRepository {
 	return &WeatherAPIRepository{
-		APIKey: apiKey,
-		l:      l,
+		APIKey:     apiKey,
+		httpClient: httpClient,
+		l:          l,
 	}
 }
 
@@ -66,7 +68,7 @@ func (w *WeatherAPIRepository) FetchForecast(ctx context.Context, lat, lon float
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := w.httpClient.Do(req)
 	if err != nil {
 		w.l.Error(err, map[string]any{
 			"repository": w.Name(),
@@ -144,6 +146,16 @@ func (w *WeatherAPIRepository) FetchForecast(ctx context.Context, lat, lon float
 
 		date := item.DtTxt[:10] // Extract just the date part
 
+		// Validate date format (should be YYYY-MM-DD)
+		if !isValidDateFormat(date) {
+			w.l.Warning("invalid date format", map[string]any{
+				"repository": w.Name(),
+				"dtTxt":      item.DtTxt,
+				"date":       date,
+			})
+			continue
+		}
+
 		if temps, exists := dailyTemps[date]; exists {
 			// Update min/max for existing date
 			if item.Main.TempMin < temps[0] {
@@ -187,4 +199,30 @@ func (w *WeatherAPIRepository) FetchForecast(ctx context.Context, lat, lon float
 	})
 
 	return result, nil
+}
+
+// isValidDateFormat checks if the date string is in YYYY-MM-DD format
+func isValidDateFormat(date string) bool {
+	if len(date) != 10 {
+		return false
+	}
+
+	// Check if the format is YYYY-MM-DD
+	// Year should be 4 digits, month 2 digits, day 2 digits
+	// Separated by hyphens
+	if date[4] != '-' || date[7] != '-' {
+		return false
+	}
+
+	// Check if all other characters are digits
+	for i, char := range date {
+		if i == 4 || i == 7 { // Skip hyphens
+			continue
+		}
+		if char < '0' || char > '9' {
+			return false
+		}
+	}
+
+	return true
 }
