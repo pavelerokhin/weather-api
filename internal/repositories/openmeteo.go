@@ -16,12 +16,14 @@ const (
 )
 
 type OpenMeteoRepository struct {
-	l *logger.Logger
+	l          *logger.Logger
+	httpClient HTTPClient
 }
 
-func NewOpenMeteoRepository(l *logger.Logger) *OpenMeteoRepository {
+func NewOpenMeteoRepository(l *logger.Logger, httpClient HTTPClient) *OpenMeteoRepository {
 	return &OpenMeteoRepository{
-		l: l,
+		l:          l,
+		httpClient: httpClient,
 	}
 }
 
@@ -61,7 +63,7 @@ func (o *OpenMeteoRepository) FetchForecast(ctx context.Context, lat, lon float6
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := o.httpClient.Do(req)
 	if err != nil {
 		o.l.Error(err, map[string]any{
 			"repository": o.Name(),
