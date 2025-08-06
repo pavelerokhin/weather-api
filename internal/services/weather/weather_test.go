@@ -20,7 +20,7 @@ type MockRepository struct {
 	name         string
 	shouldFail   bool
 	shouldDelay  bool
-	forecastData []models.Response
+	forecastData models.Forecast
 	callCount    int
 }
 
@@ -28,55 +28,70 @@ func (m *MockRepository) Name() string {
 	return m.name
 }
 
-func (m *MockRepository) FetchForecast(ctx context.Context, lat, lon float64, forecastWindow int) ([]models.Response, error) {
+func (m *MockRepository) FetchForecast(ctx context.Context, lat, lon float64, forecastWindow int) (models.Forecast, error) {
 	m.callCount++
 
 	if m.shouldDelay {
 		select {
 		case <-ctx.Done():
-			return nil, ctx.Err()
+			return models.Forecast{}, ctx.Err()
 		case <-time.After(100 * time.Millisecond):
 		}
 	}
 
 	if m.shouldFail {
-		return nil, errors.New("mock repository error")
+		return models.Forecast{}, errors.New("mock repository error")
 	}
 
 	return m.forecastData, nil
 }
 
 func TestNewWeatherService(t *testing.T) {
-	logger := logger.NewZapLogger("test-app")
+	l := logger.NewZapLogger("test-app")
 	repos := []repositories.WeatherRepository{
 		&MockRepository{name: "test-repo-1"},
 		&MockRepository{name: "test-repo-2"},
 	}
 
-	service := weather.NewWeatherService(repos, logger)
+	service := weather.NewWeatherService(repos, l)
 
 	assert.NotNil(t, service)
 }
 
 func TestWeatherService_FetchForecasts_Success(t *testing.T) {
-	logger := logger.NewZapLogger("test-app")
+	l := logger.NewZapLogger("test-app")
 
-	mockData1 := []models.Response{
-		{Date: "2025-07-25", TempMax: 25.0, TempMin: 15.0},
-		{Date: "2025-07-26", TempMax: 26.0, TempMin: 16.0},
+	date1 := time.Date(2025, 7, 25, 0, 0, 0, 0, time.UTC)
+	date2 := time.Date(2025, 7, 26, 0, 0, 0, 0, time.UTC)
+
+	mockForecast1 := models.Forecast{
+		RepositoryName: "repo-1",
+		Lat:            40.7128,
+		Lon:            -74.0060,
+		ForecastWindow: 2,
+		ForecastData: []models.WeatherData{
+			{Date: &date1, TempMax: 25.0, TempMin: 15.0},
+			{Date: &date2, TempMax: 26.0, TempMin: 16.0},
+		},
 	}
 
-	mockData2 := []models.Response{
-		{Date: "2025-07-25", TempMax: 24.5, TempMin: 14.5},
-		{Date: "2025-07-26", TempMax: 25.5, TempMin: 15.5},
+	mockForecast2 := models.Forecast{
+		RepositoryName: "repo-2",
+		Lat:            40.7128,
+		Lon:            -74.0060,
+		ForecastWindow: 2,
+		ForecastData: []models.WeatherData{
+			{Date: &date1, TempMax: 24.5, TempMin: 14.5},
+			{Date: &date2, TempMax: 25.5, TempMin: 15.5},
+		},
 	}
 
 	repos := []repositories.WeatherRepository{
-		&MockRepository{name: "repo-1", forecastData: mockData1},
-		&MockRepository{name: "repo-2", forecastData: mockData2},
+		&MockRepository{name: "repo-1", forecastData: mockForecast1},
+		&MockRepository{name: "repo-2", forecastData: mockForecast2},
 	}
 
-	service := weather.NewWeatherService(repos, logger)
+	service := weather.NewWeatherService(repos, l)
 
 	ctx := context.Background()
 	lat := 40.7128
@@ -89,24 +104,33 @@ func TestWeatherService_FetchForecasts_Success(t *testing.T) {
 	assert.NotNil(t, results)
 	assert.Len(t, results, 2)
 
-	assert.Equal(t, mockData1, results["repo-1"])
-	assert.Equal(t, mockData2, results["repo-2"])
+	assert.Equal(t, mockForecast1, results["repo-1"])
+	assert.Equal(t, mockForecast2, results["repo-2"])
 }
 
 func TestWeatherService_FetchForecasts_PartialFailure(t *testing.T) {
-	logger := logger.NewZapLogger("test-app")
+	l := logger.NewZapLogger("test-app")
 
-	mockData := []models.Response{
-		{Date: "2025-07-25", TempMax: 25.0, TempMin: 15.0},
-		{Date: "2025-07-26", TempMax: 26.0, TempMin: 16.0},
+	date1 := time.Date(2025, 7, 25, 0, 0, 0, 0, time.UTC)
+	date2 := time.Date(2025, 7, 26, 0, 0, 0, 0, time.UTC)
+
+	mockForecast := models.Forecast{
+		RepositoryName: "success-repo",
+		Lat:            40.7128,
+		Lon:            -74.0060,
+		ForecastWindow: 2,
+		ForecastData: []models.WeatherData{
+			{Date: &date1, TempMax: 25.0, TempMin: 15.0},
+			{Date: &date2, TempMax: 26.0, TempMin: 16.0},
+		},
 	}
 
 	repos := []repositories.WeatherRepository{
-		&MockRepository{name: "success-repo", forecastData: mockData},
+		&MockRepository{name: "success-repo", forecastData: mockForecast},
 		&MockRepository{name: "failure-repo", shouldFail: true},
 	}
 
-	service := weather.NewWeatherService(repos, logger)
+	service := weather.NewWeatherService(repos, l)
 
 	ctx := context.Background()
 	lat := 40.7128
@@ -119,19 +143,20 @@ func TestWeatherService_FetchForecasts_PartialFailure(t *testing.T) {
 	assert.NotNil(t, results)
 	assert.Len(t, results, 2) // Both repos should be in results
 
-	assert.Equal(t, mockData, results["success-repo"])
-	assert.Equal(t, []models.Response{}, results["failure-repo"])
+	assert.Equal(t, mockForecast, results["success-repo"])
+	assert.Equal(t, "failure-repo", results["failure-repo"].RepositoryName)
+	assert.Empty(t, results["failure-repo"].ForecastData)
 }
 
 func TestWeatherService_FetchForecasts_AllFailures(t *testing.T) {
-	logger := logger.NewZapLogger("test-app")
+	l := logger.NewZapLogger("test-app")
 
 	repos := []repositories.WeatherRepository{
 		&MockRepository{name: "failure-repo-1", shouldFail: true},
 		&MockRepository{name: "failure-repo-2", shouldFail: true},
 	}
 
-	service := weather.NewWeatherService(repos, logger)
+	service := weather.NewWeatherService(repos, l)
 
 	ctx := context.Background()
 	lat := 40.7128
@@ -143,16 +168,18 @@ func TestWeatherService_FetchForecasts_AllFailures(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, results)
 	assert.Len(t, results, 2) // Both failed repos should be included with empty arrays
-	assert.Equal(t, []models.Response{}, results["failure-repo-1"])
-	assert.Equal(t, []models.Response{}, results["failure-repo-2"])
+	assert.Equal(t, "failure-repo-1", results["failure-repo-1"].RepositoryName)
+	assert.Empty(t, results["failure-repo-1"].ForecastData)
+	assert.Equal(t, "failure-repo-2", results["failure-repo-2"].RepositoryName)
+	assert.Empty(t, results["failure-repo-2"].ForecastData)
 }
 
 func TestWeatherService_FetchForecasts_EmptyRepositories(t *testing.T) {
-	logger := logger.NewZapLogger("test-app")
+	l := logger.NewZapLogger("test-app")
 
 	repos := []repositories.WeatherRepository{}
 
-	service := weather.NewWeatherService(repos, logger)
+	service := weather.NewWeatherService(repos, l)
 
 	ctx := context.Background()
 	lat := 40.7128
@@ -167,13 +194,13 @@ func TestWeatherService_FetchForecasts_EmptyRepositories(t *testing.T) {
 }
 
 func TestWeatherService_FetchForecasts_ContextCancellation(t *testing.T) {
-	logger := logger.NewZapLogger("test-app")
+	l := logger.NewZapLogger("test-app")
 
 	repos := []repositories.WeatherRepository{
 		&MockRepository{name: "delayed-repo", shouldDelay: true},
 	}
 
-	service := weather.NewWeatherService(repos, logger)
+	service := weather.NewWeatherService(repos, l)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	lat := 40.7128
@@ -188,20 +215,50 @@ func TestWeatherService_FetchForecasts_ContextCancellation(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, results)
 	assert.Len(t, results, 1) // Failed repo should be included with empty array
-	assert.Equal(t, []models.Response{}, results["delayed-repo"])
+	assert.Equal(t, "delayed-repo", results["delayed-repo"].RepositoryName)
+	assert.Empty(t, results["delayed-repo"].ForecastData)
 }
 
 func TestWeatherService_FetchForecasts_ConcurrentExecution(t *testing.T) {
-	logger := logger.NewZapLogger("test-app")
+	l := logger.NewZapLogger("test-app")
+
+	date1 := time.Date(2025, 7, 25, 0, 0, 0, 0, time.UTC)
 
 	// Create multiple repositories with different delays to test concurrency
 	repos := []repositories.WeatherRepository{
-		&MockRepository{name: "fast-repo", forecastData: []models.Response{{Date: "2025-07-25", TempMax: 25.0, TempMin: 15.0}}},
-		&MockRepository{name: "medium-repo", forecastData: []models.Response{{Date: "2025-07-25", TempMax: 24.0, TempMin: 14.0}}},
-		&MockRepository{name: "slow-repo", forecastData: []models.Response{{Date: "2025-07-25", TempMax: 23.0, TempMin: 13.0}}},
+		&MockRepository{
+			name: "fast-repo",
+			forecastData: models.Forecast{
+				RepositoryName: "fast-repo",
+				Lat:            40.7128,
+				Lon:            -74.0060,
+				ForecastWindow: 1,
+				ForecastData:   []models.WeatherData{{Date: &date1, TempMax: 25.0, TempMin: 15.0}},
+			},
+		},
+		&MockRepository{
+			name: "medium-repo",
+			forecastData: models.Forecast{
+				RepositoryName: "medium-repo",
+				Lat:            40.7128,
+				Lon:            -74.0060,
+				ForecastWindow: 1,
+				ForecastData:   []models.WeatherData{{Date: &date1, TempMax: 24.0, TempMin: 14.0}},
+			},
+		},
+		&MockRepository{
+			name: "slow-repo",
+			forecastData: models.Forecast{
+				RepositoryName: "slow-repo",
+				Lat:            40.7128,
+				Lon:            -74.0060,
+				ForecastWindow: 1,
+				ForecastData:   []models.WeatherData{{Date: &date1, TempMax: 23.0, TempMin: 13.0}},
+			},
+		},
 	}
 
-	service := weather.NewWeatherService(repos, logger)
+	service := weather.NewWeatherService(repos, l)
 
 	ctx := context.Background()
 	lat := 40.7128
@@ -232,17 +289,23 @@ func TestWeatherService_FetchForecasts_ConcurrentExecution(t *testing.T) {
 }
 
 func TestWeatherService_FetchForecasts_DefaultForecastWindow(t *testing.T) {
-	logger := logger.NewZapLogger("test-app")
+	l := logger.NewZapLogger("test-app")
 
-	mockData := []models.Response{
-		{Date: "2025-07-25", TempMax: 25.0, TempMin: 15.0},
+	date1 := time.Date(2025, 7, 25, 0, 0, 0, 0, time.UTC)
+
+	mockForecast := models.Forecast{
+		RepositoryName: "test-repo",
+		Lat:            40.7128,
+		Lon:            -74.0060,
+		ForecastWindow: 0,
+		ForecastData:   []models.WeatherData{{Date: &date1, TempMax: 25.0, TempMin: 15.0}},
 	}
 
 	repos := []repositories.WeatherRepository{
-		&MockRepository{name: "test-repo", forecastData: mockData},
+		&MockRepository{name: "test-repo", forecastData: mockForecast},
 	}
 
-	service := weather.NewWeatherService(repos, logger)
+	service := weather.NewWeatherService(repos, l)
 
 	ctx := context.Background()
 	lat := 40.7128
@@ -254,17 +317,17 @@ func TestWeatherService_FetchForecasts_DefaultForecastWindow(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotNil(t, results)
 	assert.Len(t, results, 1)
-	assert.Equal(t, mockData, results["test-repo"])
+	assert.Equal(t, mockForecast, results["test-repo"])
 }
 
 func TestWeatherService_FetchForecasts_InvalidCoordinates(t *testing.T) {
-	logger := logger.NewZapLogger("test-app")
+	l := logger.NewZapLogger("test-app")
 
 	repos := []repositories.WeatherRepository{
 		&MockRepository{name: "test-repo", shouldFail: true}, // Will fail with invalid coordinates
 	}
 
-	service := weather.NewWeatherService(repos, logger)
+	service := weather.NewWeatherService(repos, l)
 
 	ctx := context.Background()
 	lat := 999.0 // Invalid latitude
@@ -276,28 +339,39 @@ func TestWeatherService_FetchForecasts_InvalidCoordinates(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, results)
 	assert.Len(t, results, 1) // Failed repo should be included with empty array
-	assert.Equal(t, []models.Response{}, results["test-repo"])
+	assert.Equal(t, "test-repo", results["test-repo"].RepositoryName)
+	assert.Empty(t, results["test-repo"].ForecastData)
 }
 
 func TestWeatherService_FetchForecasts_MixedSuccessAndFailure(t *testing.T) {
-	logger := logger.NewZapLogger("test-app")
+	l := logger.NewZapLogger("test-app")
 
-	mockData1 := []models.Response{
-		{Date: "2025-07-25", TempMax: 25.0, TempMin: 15.0},
+	date1 := time.Date(2025, 7, 25, 0, 0, 0, 0, time.UTC)
+
+	mockForecast1 := models.Forecast{
+		RepositoryName: "success-1",
+		Lat:            40.7128,
+		Lon:            -74.0060,
+		ForecastWindow: 1,
+		ForecastData:   []models.WeatherData{{Date: &date1, TempMax: 25.0, TempMin: 15.0}},
 	}
 
-	mockData2 := []models.Response{
-		{Date: "2025-07-25", TempMax: 24.0, TempMin: 14.0},
+	mockForecast2 := models.Forecast{
+		RepositoryName: "success-2",
+		Lat:            40.7128,
+		Lon:            -74.0060,
+		ForecastWindow: 1,
+		ForecastData:   []models.WeatherData{{Date: &date1, TempMax: 24.0, TempMin: 14.0}},
 	}
 
 	repos := []repositories.WeatherRepository{
-		&MockRepository{name: "success-1", forecastData: mockData1},
+		&MockRepository{name: "success-1", forecastData: mockForecast1},
 		&MockRepository{name: "failure-1", shouldFail: true},
-		&MockRepository{name: "success-2", forecastData: mockData2},
+		&MockRepository{name: "success-2", forecastData: mockForecast2},
 		&MockRepository{name: "failure-2", shouldFail: true},
 	}
 
-	service := weather.NewWeatherService(repos, logger)
+	service := weather.NewWeatherService(repos, l)
 
 	ctx := context.Background()
 	lat := 40.7128
@@ -310,8 +384,10 @@ func TestWeatherService_FetchForecasts_MixedSuccessAndFailure(t *testing.T) {
 	assert.NotNil(t, results)
 	assert.Len(t, results, 4) // All repos should be in results
 
-	assert.Equal(t, mockData1, results["success-1"])
-	assert.Equal(t, mockData2, results["success-2"])
-	assert.Equal(t, []models.Response{}, results["failure-1"])
-	assert.Equal(t, []models.Response{}, results["failure-2"])
+	assert.Equal(t, mockForecast1, results["success-1"])
+	assert.Equal(t, mockForecast2, results["success-2"])
+	assert.Equal(t, "failure-1", results["failure-1"].RepositoryName)
+	assert.Empty(t, results["failure-1"].ForecastData)
+	assert.Equal(t, "failure-2", results["failure-2"].RepositoryName)
+	assert.Empty(t, results["failure-2"].ForecastData)
 }

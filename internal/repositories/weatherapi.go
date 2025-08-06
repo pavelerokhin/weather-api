@@ -3,9 +3,12 @@ package repositories
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
+	"time"
 
 	"weather-api/internal/models"
 	"weather-api/pkg/logger"
@@ -21,12 +24,16 @@ type WeatherAPIRepository struct {
 	l          *logger.Logger
 }
 
-func NewWeatherAPIRepository(apiKey string, l *logger.Logger, httpClient HTTPClient) *WeatherAPIRepository {
+func NewWeatherAPIRepository(apiKey string, l *logger.Logger, httpClient HTTPClient) (*WeatherAPIRepository, error) {
+	if strings.TrimSpace(apiKey) == "" {
+		return nil, errors.New("API key cannot be empty")
+	}
+
 	return &WeatherAPIRepository{
 		APIKey:     apiKey,
 		httpClient: httpClient,
 		l:          l,
-	}
+	}, nil
 }
 
 func (w *WeatherAPIRepository) Name() string {
@@ -44,185 +51,128 @@ type WeatherAPIResponse struct {
 	} `json:"list"`
 }
 
-type WeatherAPIErrorResponse struct {
-	Cod     string `json:"cod"`
-	Message string `json:"message"`
-}
+func (w *WeatherAPIRepository) FetchForecast(
+	ctx context.Context,
+	lat float64,
+	lon float64,
+	forecastWindow int,
+) (models.Forecast, error) {
+	forecast := models.Forecast{
+		RepositoryName: w.Name(),
+		Lat:            lat,
+		Lon:            lon,
+		ForecastWindow: forecastWindow,
+	}
 
-func (w *WeatherAPIRepository) FetchForecast(ctx context.Context, lat, lon float64, forecastWindow int) ([]models.Response, error) {
+	// Validate API key before making request
+	if strings.TrimSpace(w.APIKey) == "" {
+		return forecast, errors.New("API key cannot be empty")
+	}
+
 	url := fmt.Sprintf("%s?lat=%f&lon=%f&units=metric&appid=%s", WeatherAPIBaseURL, lat, lon, w.APIKey)
 
-	w.l.Info("making API request", map[string]any{
-		"repository": w.Name(),
-		"url":        url,
-		"lat":        lat,
-		"lon":        lon,
-		"window":     forecastWindow,
+	w.l.Info("making weatherapi API request", map[string]any{
+		"params": forecast.RequestParams(),
 	})
 
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
-		w.l.Error(err, map[string]any{
-			"repository": w.Name(),
-		})
-		return nil, fmt.Errorf("failed to create request: %w", err)
+		return forecast, fmt.Errorf("failed to create request: %w", err)
 	}
 
 	resp, err := w.httpClient.Do(req)
 	if err != nil {
-		w.l.Error(err, map[string]any{
-			"repository": w.Name(),
-		})
-		return nil, fmt.Errorf("failed to make request: %w", err)
+		return forecast, fmt.Errorf("failed to do request: %w", err)
 	}
 	defer resp.Body.Close()
 
-	w.l.Info("received API response", map[string]any{
-		"repository": w.Name(),
+	w.l.Info("received weatherapi API response", map[string]any{
 		"status":     resp.StatusCode,
 		"statusText": resp.Status,
 	})
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		w.l.Error(err, map[string]any{
-			"repository": w.Name(),
-		})
-		return nil, fmt.Errorf("failed to read response body: %w", err)
+		return forecast, fmt.Errorf("failed to read response body: %w", err)
 	}
 
-	// Check for HTTP error status codes
 	if resp.StatusCode != http.StatusOK {
-		var errorResp WeatherAPIErrorResponse
-		if jsonErr := json.Unmarshal(body, &errorResp); jsonErr == nil {
-			w.l.Error(fmt.Errorf("API error: %s", errorResp.Message), map[string]any{
-				"repository": w.Name(),
-				"statusCode": resp.StatusCode,
-				"errorCode":  errorResp.Cod,
-			})
-			return nil, fmt.Errorf("API error (status %d): %s", resp.StatusCode, errorResp.Message)
-		}
-
-		w.l.Error(fmt.Errorf("HTTP error: %s", resp.Status), map[string]any{
-			"repository": w.Name(),
-			"statusCode": resp.StatusCode,
-			"body":       string(body),
-		})
-		return nil, fmt.Errorf("HTTP error (status %d): %s", resp.StatusCode, resp.Status)
+		return forecast, fmt.Errorf("HTTP error (status %d): %s", resp.StatusCode, resp.Status)
 	}
 
 	var response WeatherAPIResponse
 	if err := json.Unmarshal(body, &response); err != nil {
-		return nil, fmt.Errorf("failed to parse JSON response: %w", err)
+		return forecast, fmt.Errorf("failed to parse JSON response: %w", err)
 	}
 
 	w.l.Info("parsed API response", map[string]any{
-		"repository": w.Name(),
-		"items":      len(response.List),
+		"items": len(response.List),
 	})
 
 	// Check if we have any data
 	if len(response.List) == 0 {
-		w.l.Warning("no forecast data received", map[string]any{
-			"repository": w.Name(),
-		})
-		return nil, fmt.Errorf("no forecast data available")
+		return forecast, fmt.Errorf("no forecast data available")
 	}
 
-	// Organize data by date and convert to models.Response slice
-	var result []models.Response
-	dailyTemps := make(map[string][]float64) // date -> []{min, max}
+	// Process daily temperatures
+	dailyTemps, err := dailyTemperaturesWeatherAPI(response)
+	if err != nil {
+		return forecast, fmt.Errorf("failed to process daily temperatures: %w", err)
+	}
+
+	forecast.ForecastData = dailyTemps[:forecastWindow]
+
+	return forecast, nil
+}
+
+func dailyTemperaturesWeatherAPI(response WeatherAPIResponse) ([]models.WeatherData, error) {
+	var dailyTemps []models.WeatherData
 
 	// Group temperatures by date
 	for _, item := range response.List {
 		// Parse the date from dt_txt (format: "2025-07-25 18:00:00")
-		if len(item.DtTxt) < 10 {
-			w.l.Warning("invalid date format", map[string]any{
-				"repository": w.Name(),
-				"dtTxt":      item.DtTxt,
+		date, err := parseDate(item.DtTxt)
+		if err != nil {
+			return dailyTemps, fmt.Errorf("failed to parse date from dt_txt %s: %w", item.DtTxt, err)
+		}
+
+		index := models.FilterByDate(dailyTemps, date)
+
+		if index == -1 {
+			// Create new entry for this date
+			dailyTemps = append(dailyTemps, models.WeatherData{
+				Date:    date,
+				TempMin: item.Main.TempMin,
+				TempMax: item.Main.TempMax,
 			})
 			continue
 		}
 
-		date := item.DtTxt[:10] // Extract just the date part
-
-		// Validate date format (should be YYYY-MM-DD)
-		if !isValidDateFormat(date) {
-			w.l.Warning("invalid date format", map[string]any{
-				"repository": w.Name(),
-				"dtTxt":      item.DtTxt,
-				"date":       date,
-			})
-			continue
+		// Update existing entry
+		if item.Main.TempMin < dailyTemps[index].TempMin {
+			dailyTemps[index].TempMin = item.Main.TempMin
 		}
-
-		if temps, exists := dailyTemps[date]; exists {
-			// Update min/max for existing date
-			if item.Main.TempMin < temps[0] {
-				temps[0] = item.Main.TempMin
-			}
-			if item.Main.TempMax > temps[1] {
-				temps[1] = item.Main.TempMax
-			}
-			dailyTemps[date] = temps
-		} else {
-			// Initialize min/max for new date
-			dailyTemps[date] = []float64{item.Main.TempMin, item.Main.TempMax}
+		if item.Main.TempMax > dailyTemps[index].TempMax {
+			dailyTemps[index].TempMax = item.Main.TempMax
 		}
 	}
 
-	w.l.Info("processed daily temperatures", map[string]any{
-		"repository": w.Name(),
-		"dates":      len(dailyTemps),
-		"dailyTemps": dailyTemps,
-	})
-
-	// Convert to final result format and limit to forecastWindow days
-	count := 0
-	for date, temps := range dailyTemps {
-		if count >= forecastWindow {
-			break
-		}
-		response := models.Response{
-			Date:    date,
-			TempMax: temps[1],
-			TempMin: temps[0],
-		}
-		result = append(result, response)
-		count++
-	}
-
-	w.l.Info("final forecast result", map[string]any{
-		"repository": w.Name(),
-		"days":       len(result),
-		"forecast":   result,
-	})
-
-	return result, nil
+	return dailyTemps, nil
 }
 
-// isValidDateFormat checks if the date string is in YYYY-MM-DD format
-func isValidDateFormat(date string) bool {
-	if len(date) != 10 {
-		return false
+func parseDate(dateStr string) (*time.Time, error) {
+	if len(dateStr) < 10 {
+		// Skip if the date format is unexpected
+		return nil, fmt.Errorf("invalid date string: %s", dateStr)
 	}
 
-	// Check if the format is YYYY-MM-DD
-	// Year should be 4 digits, month 2 digits, day 2 digits
-	// Separated by hyphens
-	if date[4] != '-' || date[7] != '-' {
-		return false
+	dateStr = dateStr[:10] // Extract just the date part
+
+	// Parse the date string in the format "2025-07-25"
+	t, err := time.Parse("2006-01-02", dateStr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse date %s: %w", dateStr, err)
 	}
 
-	// Check if all other characters are digits
-	for i, char := range date {
-		if i == 4 || i == 7 { // Skip hyphens
-			continue
-		}
-		if char < '0' || char > '9' {
-			return false
-		}
-	}
-
-	return true
+	return &t, nil
 }

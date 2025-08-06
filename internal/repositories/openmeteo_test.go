@@ -68,30 +68,32 @@ func TestOpenMeteoRepository_FetchForecast_Success(t *testing.T) {
 		t.Fatalf("Expected no error, got: %v", err)
 	}
 
-	if len(result) != 2 {
-		t.Errorf("Expected 2 days of weather data, got %d", len(result))
+	if len(result.ForecastData) != 2 {
+		t.Errorf("Expected 2 days of weather data, got %d", len(result.ForecastData))
 	}
 
 	// Verify the first day
-	if result[0].Date != "2025-01-27" {
-		t.Errorf("Expected date 2025-01-27, got %s", result[0].Date)
+	expectedDate1, _ := time.Parse("2006-01-02", "2025-01-27")
+	if result.ForecastData[0].Date == nil || !result.ForecastData[0].Date.Equal(expectedDate1) {
+		t.Errorf("Expected date 2025-01-27, got %v", result.ForecastData[0].Date)
 	}
-	if result[0].TempMax != 25.5 {
-		t.Errorf("Expected max temp 25.5, got %f", result[0].TempMax)
+	if result.ForecastData[0].TempMax != 25.5 {
+		t.Errorf("Expected max temp 25.5, got %f", result.ForecastData[0].TempMax)
 	}
-	if result[0].TempMin != 15.2 {
-		t.Errorf("Expected min temp 15.2, got %f", result[0].TempMin)
+	if result.ForecastData[0].TempMin != 15.2 {
+		t.Errorf("Expected min temp 15.2, got %f", result.ForecastData[0].TempMin)
 	}
 
 	// Verify the second day
-	if result[1].Date != "2025-01-28" {
-		t.Errorf("Expected date 2025-01-28, got %s", result[1].Date)
+	expectedDate2, _ := time.Parse("2006-01-02", "2025-01-28")
+	if result.ForecastData[1].Date == nil || !result.ForecastData[1].Date.Equal(expectedDate2) {
+		t.Errorf("Expected date 2025-01-28, got %v", result.ForecastData[1].Date)
 	}
-	if result[1].TempMax != 26.2 {
-		t.Errorf("Expected max temp 26.2, got %f", result[1].TempMax)
+	if result.ForecastData[1].TempMax != 26.2 {
+		t.Errorf("Expected max temp 26.2, got %f", result.ForecastData[1].TempMax)
 	}
-	if result[1].TempMin != 16.1 {
-		t.Errorf("Expected min temp 16.1, got %f", result[1].TempMin)
+	if result.ForecastData[1].TempMin != 16.1 {
+		t.Errorf("Expected min temp 16.1, got %f", result.ForecastData[1].TempMin)
 	}
 }
 
@@ -244,8 +246,8 @@ func TestOpenMeteoRepository_FetchForecast_InvalidTemperatureData(t *testing.T) 
 	}
 
 	// Should filter out invalid temperature data
-	if len(result) != 0 {
-		t.Errorf("Expected 0 valid days, got %d", len(result))
+	if len(result.ForecastData) != 0 {
+		t.Errorf("Expected 0 valid days, got %d", len(result.ForecastData))
 	}
 }
 
@@ -310,12 +312,12 @@ func TestOpenMeteoRepository_RealAPI(t *testing.T) {
 		t.Fatalf("Real API call failed: %v", err)
 	}
 
-	if len(result) == 0 {
+	if len(result.ForecastData) == 0 {
 		t.Fatal("Expected weather data, got empty result")
 	}
 
 	// Verify each response has proper weather data
-	for _, response := range result {
+	for _, response := range result.ForecastData {
 		// Verify temperature values are reasonable for Berlin
 		if response.TempMax < -50 || response.TempMax > 50 {
 			t.Errorf("Max temperature for %s seems unreasonable: %f°C", response.Date, response.TempMax)

@@ -24,10 +24,10 @@ func (c *DefaultHTTPClient) Do(req *http.Request) (*http.Response, error) {
 
 type WeatherRepository interface {
 	Name() string
-	FetchForecast(ctx context.Context, lat, lon float64, forecastWindow int) ([]models.Response, error)
+	FetchForecast(ctx context.Context, lat, lon float64, forecastWindow int) (models.Forecast, error)
 }
 
-func InitWeatherRepositories(cfg *config.Config, l *logger.Logger) []WeatherRepository {
+func InitWeatherRepositories(cfg *config.Config, l *logger.Logger) ([]WeatherRepository, error) {
 	var repos []WeatherRepository
 	httpClient := &DefaultHTTPClient{}
 
@@ -36,10 +36,14 @@ func InitWeatherRepositories(cfg *config.Config, l *logger.Logger) []WeatherRepo
 		case "open-meteo":
 			repos = append(repos, NewOpenMeteoRepository(l, httpClient))
 		case "weatherapi":
-			repos = append(repos, NewWeatherAPIRepository(api.APIKey, l, httpClient))
+			repo, err := NewWeatherAPIRepository(api.APIKey, l, httpClient)
+			if err != nil {
+				return nil, err
+			}
+			repos = append(repos, repo)
 			// add more cases for new providers to extend the app
 		}
 	}
 
-	return repos
+	return repos, nil
 }

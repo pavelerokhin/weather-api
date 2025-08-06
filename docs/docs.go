@@ -43,7 +43,7 @@ const docTemplate = `{
                         "minimum": -90,
                         "type": "number",
                         "example": 40.7128,
-                        "description": "Latitude coordinate (-90 to 90)",
+                        "description": "Lat coordinate (-90 to 90)",
                         "name": "lat",
                         "in": "query",
                         "required": true
@@ -53,7 +53,7 @@ const docTemplate = `{
                         "minimum": -180,
                         "type": "number",
                         "example": -74.006,
-                        "description": "Longitude coordinate (-180 to 180)",
+                        "description": "Lon coordinate (-180 to 180)",
                         "name": "lon",
                         "in": "query",
                         "required": true

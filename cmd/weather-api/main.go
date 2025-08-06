@@ -49,7 +49,11 @@ func main() {
 
 	app := httpserver.InitFiberServer(cnf.App.Name)
 
-	repos := repositories.InitWeatherRepositories(cnf, l)
+	repos, err := repositories.InitWeatherRepositories(cnf, l)
+	if err != nil {
+		l.Fatal("failed to initialize weather repositories", map[string]any{"err": err})
+		os.Exit(1)
+	}
 
 	service := weather.NewWeatherService(repos, l)
 
@@ -65,7 +69,7 @@ func main() {
 		}
 	}()
 
-	l.Info("application started successfully", map[string]any{
+	l.Info("starting application", map[string]any{
 		"port": cnf.Server.Port,
 		"env":  cnf.App.Env,
 		"name": cnf.App.Name,
